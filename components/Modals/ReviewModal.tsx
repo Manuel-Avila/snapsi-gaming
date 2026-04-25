@@ -159,7 +159,6 @@ export default function ReviewModal({
             placeholder={readOnly ? "" : "What did you think of the game?"}
             placeholderTextColor={COLORS.gray}
           />
-          <View style={styles.fieldBorder} />
         </View>
 
         {!readOnly ? (
@@ -240,17 +239,16 @@ const styles = StyleSheet.create({
   descriptionLabel: {
     color: COLORS.gray,
     fontSize: 12,
-    marginBottom: 10,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   descriptionInput: {
     color: COLORS.text,
     fontSize: 15,
-    minHeight: 80,
+    minHeight: 120,
     textAlignVertical: "top",
-    paddingBottom: 10,
-  },
-  fieldBorder: {
-    height: 1,
-    backgroundColor: COLORS.gray,
+    backgroundColor: COLORS.buttonBackground,
+    borderRadius: 15,
+    padding: 15,
   },
 });
