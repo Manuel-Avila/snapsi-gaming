@@ -5,7 +5,9 @@ import ProfileInformation from "@/components/ProfileInformation";
 import PulsateButton from "@/components/ui/PulsateButton";
 import { COLORS } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
-import { usePost } from "@/hooks/usePost";
+import { useOffline } from "@/context/OfflineContext";
+import { getUserPostsFromDb } from "@/hooks/useOfflinePosts";
+import { getUserReviewsFromDb } from "@/hooks/useOfflineReviews";
 import { useProfile } from "@/hooks/useProfile";
 import { IPost } from "@/types/PostTypes";
 import type { IUserProfile } from "@/types/UserTypes";
@@ -14,14 +16,12 @@ import { useState } from "react";
 import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { useInfiniteQuery, useQuery, useQueryClient } from "react-query";
 import RatingsContainer from "@/components/RatingsContainer";
-import { useGames } from "@/hooks/useGames";
 import type { IGameReview } from "@/types/GameTypes";
 
 export default function Profile() {
   const { getMyProfile } = useProfile();
   const { logout } = useAuth();
-  const { getUserPosts } = usePost();
-  const { getUserReviews } = useGames();
+  const { triggerSync, isDbReady } = useOffline();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<"posts" | "ratings">("posts");
   const { data: myProfile, isLoading: isProfileLoading } =
@@ -36,9 +36,9 @@ export default function Profile() {
     isFetchingNextPage: arePostsFetchingNextPage,
     refetch: refetchPosts,
     isFetching: arePostsFetching,
-  } = useInfiniteQuery(["posts", myProfile?.username || ""], getUserPosts, {
+  } = useInfiniteQuery(["posts", myProfile?.username || ""], getUserPostsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: !!myProfile?.username,
+    enabled: !!myProfile?.username && isDbReady,
     refetchOnWindowFocus: false,
   });
 
@@ -50,13 +50,14 @@ export default function Profile() {
     isFetchingNextPage: areReviewsFetchingNextPage,
     refetch: refetchReviews,
     isFetching: areReviewsFetching,
-  } = useInfiniteQuery(["gameReviews", myProfile?.username || ""], getUserReviews, {
+  } = useInfiniteQuery(["gameReviews", myProfile?.username || ""], getUserReviewsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: !!myProfile?.username && activeTab === "ratings",
+    enabled: !!myProfile?.username && activeTab === "ratings" && isDbReady,
     refetchOnWindowFocus: false,
   });
 
   const handleRefetch = async () => {
+    await triggerSync();
     if (activeTab === "posts") {
       refetchPosts();
     } else {

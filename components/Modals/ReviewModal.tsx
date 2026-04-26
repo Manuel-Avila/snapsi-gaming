@@ -13,8 +13,10 @@ import CustomTextInput from "../ui/CustomTextInput";
 import PulsateButton from "../ui/PulsateButton";
 import { Modal } from "../ui/Modal";
 import type { IGameReview } from "@/types/GameTypes";
-import { useGames } from "@/hooks/useGames";
+import * as ReviewRepo from "@/db/reviewRepository";
+import * as SyncQueue from "@/db/syncQueueRepository";
 import { useMutation, useQueryClient } from "react-query";
+import { IUserProfile } from "@/types/UserTypes";
 import Toast from "react-native-toast-message";
 
 type Props = {
@@ -25,6 +27,17 @@ type Props = {
   gameImage?: string;
   existingReview?: IGameReview;
   readOnly?: boolean;
+};
+
+const generateLocalId = (): string =>
+  `local_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+type ReviewMutationPayload = {
+  game_id: number;
+  game_name: string;
+  game_image?: string;
+  rating: number;
+  description?: string;
 };
 
 export default function ReviewModal({
@@ -43,10 +56,45 @@ export default function ReviewModal({
     existingReview ? existingReview.description || "" : ""
   );
   const [ratingError, setRatingError] = useState<string | undefined>(undefined);
-  const { createReview } = useGames();
   const queryClient = useQueryClient();
 
-  const createMutation = useMutation(createReview, {
+  const createMutation = useMutation({
+    mutationFn: async (data: ReviewMutationPayload) => {
+      const localId = generateLocalId();
+      const myProfile = queryClient.getQueryData<IUserProfile>(["myProfile"]);
+
+      if (!myProfile?.id || !myProfile?.username) {
+        throw new Error("Missing user profile in cache");
+      }
+
+      await ReviewRepo.insertLocalReview({
+        localId,
+        userId: myProfile.id,
+        gameId: data.game_id,
+        gameName: data.game_name,
+        gameImage: data.game_image,
+        rating: data.rating,
+        description: data.description,
+        userName: myProfile.name,
+        userUsername: myProfile.username,
+        userProfilePictureUrl: myProfile.profile_picture_url ?? "",
+      });
+
+      // Keep only the latest pending review change for this game.
+      await SyncQueue.removePendingReviewByGameId(data.game_id, myProfile.id);
+
+      await SyncQueue.enqueue("create_review", {
+        localId,
+        userId: myProfile.id,
+        gameId: data.game_id,
+        gameName: data.game_name,
+        gameImage: data.game_image,
+        rating: data.rating,
+        description: data.description,
+      });
+
+      return { localId };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(["gameReviews"]);
       Toast.show({
@@ -63,7 +111,7 @@ export default function ReviewModal({
         text1: "Error",
         text2: "Something went wrong. Please try again.",
       });
-    },
+    }
   });
 
   useEffect(() => {

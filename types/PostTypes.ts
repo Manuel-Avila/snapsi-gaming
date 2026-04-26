@@ -7,6 +7,7 @@ export type IGameTag = {
 
 export type IPost = {
   id: number;
+  local_id?: string;
   image_url: string;
   image_cloudinary_id: string;
   caption: string;
@@ -16,6 +17,7 @@ export type IPost = {
   is_liked: boolean;
   is_bookmarked: boolean;
   is_optimistic?: boolean;
+  sync_status?: 'synced' | 'pending' | 'failed';
   tags?: IGameTag[];
   user: {
     id: number;
@@ -33,5 +35,5 @@ export type ICreatePostData = {
 
 export type IGetPostsResponse = {
   posts: IPost[];
-  nextCursor: string | null;
+  nextCursor: string | number | null;
 };

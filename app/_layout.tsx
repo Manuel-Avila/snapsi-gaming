@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { toastConfig } from "@/components/ui/ToastConfig";
 import { AuthProvider } from "@/context/AuthContext";
+import { OfflineProvider } from "@/context/OfflineContext";
 import RouteGuardLayout from "@/components/RouteGuardLayout";
 
 const queryClient = new QueryClient();
@@ -16,19 +17,21 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaProvider>
-            <SafeAreaView
-              style={{ flex: 1, backgroundColor: COLORS.background }}
-            >
-              <StatusBar style="light" />
-              <RouteGuardLayout />
-            </SafeAreaView>
-            <Toast config={toastConfig} />
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      </AuthProvider>
+      <OfflineProvider>
+        <AuthProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+              <SafeAreaView
+                style={{ flex: 1, backgroundColor: COLORS.background }}
+              >
+                <StatusBar style="light" />
+                <RouteGuardLayout />
+              </SafeAreaView>
+              <Toast config={toastConfig} />
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        </AuthProvider>
+      </OfflineProvider>
     </QueryClientProvider>
   );
 }

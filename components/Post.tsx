@@ -48,6 +48,10 @@ export default function Post({ post, openComments }: Props) {
   }, [post, queryClient]);
 
   const handleToggleAction = (action: string) => {
+    const postIdentifier = {
+      localId: post.local_id || `server_${post.id}`,
+      postId: post.id,
+    };
     let mutationFn;
     if (action === "like") {
       mutationFn = post.is_liked ? handleUnlikePost : handleLikePost;
@@ -58,7 +62,7 @@ export default function Post({ post, openComments }: Props) {
     }
 
     if (mutationFn) {
-      mutationFn(post.id);
+      mutationFn(postIdentifier);
     }
   };
 
@@ -67,15 +71,17 @@ export default function Post({ post, openComments }: Props) {
     if (pathname.includes("/post/")) {
       router.back();
     }
-    handleDeletePost(post.id);
+    handleDeletePost({
+      localId: post.local_id || `server_${post.id}`,
+      postId: post.id,
+    });
   };
 
-  const isOptimistic = post.is_optimistic;
   const isLikeToggling = isLiking || isUnliking;
   const isBookmarkToggling = isBookmarking || isUnbookmarking;
 
   return (
-    <View style={[styles.container, isOptimistic && styles.optimistic]}>
+    <View style={styles.container}>
       <View style={styles.bar}>
         <Link href={`/user/${post.user.username}`} asChild>
           <PulsateButton style={styles.userContainer}>
@@ -98,7 +104,7 @@ export default function Post({ post, openComments }: Props) {
         {showActions && (
           <PulsateButton
             onPress={() => setShowConfirmationModal(true)}
-            disabled={isDeleting || isOptimistic}
+            disabled={isDeleting}
           >
             <Ionicons name="trash-outline" size={20} style={[styles.white]} />
           </PulsateButton>
@@ -138,7 +144,7 @@ export default function Post({ post, openComments }: Props) {
         <View style={styles.metricsContainer}>
           <PulsateButton
             onPress={() => handleToggleAction("like")}
-            disabled={isLikeToggling || isOptimistic}
+            disabled={isLikeToggling}
             style={styles.flexRow}
           >
             {post.is_liked ? (
@@ -154,7 +160,6 @@ export default function Post({ post, openComments }: Props) {
           <PulsateButton
             onPress={() => setShowComments(true)}
             style={styles.flexRow}
-            disabled={isOptimistic}
           >
             <Ionicons
               name="chatbubble-outline"
@@ -168,7 +173,7 @@ export default function Post({ post, openComments }: Props) {
         </View>
         <PulsateButton
           onPress={() => handleToggleAction("bookmark")}
-          disabled={isBookmarkToggling || isOptimistic}
+          disabled={isBookmarkToggling}
         >
           {post.is_bookmarked ? (
             <Ionicons name="bookmark" size={25} style={styles.bookmarked} />
@@ -201,9 +206,6 @@ export default function Post({ post, openComments }: Props) {
 const styles = StyleSheet.create({
   container: {
     gap: 10,
-  },
-  optimistic: {
-    opacity: 0.6,
   },
   bar: {
     flexDirection: "row",

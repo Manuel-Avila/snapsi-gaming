@@ -2,6 +2,11 @@ import api from "@/api/apiClient";
 import type { IUpdateProfileData, IUserProfile } from "@/types/UserTypes";
 
 export const useProfile = () => {
+  const isLocalFileUri = (uri?: string): boolean => {
+    if (!uri) return false;
+    return uri.startsWith("file://") || uri.startsWith("content://");
+  };
+
   const getMyProfile = async (): Promise<IUserProfile> => {
     const response = await api.get("/profile");
 
@@ -11,7 +16,7 @@ export const useProfile = () => {
   const updateProfile = async (data: IUpdateProfileData) => {
     const formData = new FormData();
 
-    if (data.imageUri) {
+    if (isLocalFileUri(data.imageUri)) {
       const fileName = data.imageUri?.split("/").pop();
       const fileType = fileName?.split(".").pop();
       formData.append("image", {

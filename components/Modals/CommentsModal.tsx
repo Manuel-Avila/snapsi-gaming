@@ -1,8 +1,9 @@
 import { PLACEHOLDER_PROFILE_IMAGE } from "@/constants/assets";
 import { COLORS } from "@/constants/theme";
 import { useFormSubmit } from "@/hooks/useFormSubmit";
-import { usePost } from "@/hooks/usePost";
 import { usePostMutations } from "@/hooks/usePostMutations";
+import { useOffline } from "@/context/OfflineContext";
+import { getCommentsFromDb } from "@/hooks/useOfflineComments";
 import { IUserProfile } from "@/types/UserTypes";
 import { addCommentSchema } from "@/validators/commentValidator";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,7 +33,7 @@ type props = {
 
 export default function CommentsModal({ isVisible, onClose, postId }: props) {
   const safeAreaInsets = useSafeAreaInsets();
-  const { getComments } = usePost();
+  const { isDbReady } = useOffline();
   const [comment, setComment] = useState("");
   const { submitForm, isSubmitting } = useFormSubmit();
   const { handleAddComment, isAddingComment } = usePostMutations();
@@ -48,9 +49,9 @@ export default function CommentsModal({ isVisible, onClose, postId }: props) {
     isFetchingNextPage,
     isLoading,
     isFetching,
-  } = useInfiniteQuery(["comments", postId], getComments, {
+  } = useInfiniteQuery(["comments", postId], getCommentsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: !!postId && isVisible,
+    enabled: !!postId && isVisible && isDbReady,
     refetchOnWindowFocus: false,
   });
   const comments = data?.pages.flatMap((page) => page.comments ?? []);

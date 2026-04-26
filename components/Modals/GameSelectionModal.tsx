@@ -18,6 +18,8 @@ import { useQuery } from "react-query";
 import type { IGameCategory, IRawgGame } from "@/types/GameTypes";
 import { Image } from "expo-image";
 import Toast from "react-native-toast-message";
+import * as NetworkService from "@/services/networkService";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   isVisible: boolean;
@@ -29,10 +31,12 @@ type Props = {
 };
 
 export default function GameSelectionModal({ isVisible, onClose, onApplyFilter, title = "Select Game/Category", showToastOnSelect = false, showClearButton = true }: Props) {
+  const safeAreaInsets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<"category" | "game">("category");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const { getCategories, searchGames } = useGames();
+  const isOnline = NetworkService.isOnline();
 
   // Debounce search query
   useEffect(() => {
@@ -126,6 +130,13 @@ export default function GameSelectionModal({ isVisible, onClose, onApplyFilter, 
                   <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
                 </TouchableOpacity>
               )}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  {isOnline
+                    ? "No categories available"
+                    : "No cached categories yet. Connect once to sync categories."}
+                </Text>
+              }
               showsVerticalScrollIndicator={false}
             />
           )
@@ -160,6 +171,13 @@ export default function GameSelectionModal({ isVisible, onClose, onApplyFilter, 
                     <Text style={styles.listText}>{item.name}</Text>
                   </TouchableOpacity>
                 )}
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>
+                    {isOnline
+                      ? "No games found"
+                      : "No cached games yet. Connect once and search to build offline cache."}
+                  </Text>
+                }
                 showsVerticalScrollIndicator={false}
               />
             )}
@@ -168,7 +186,10 @@ export default function GameSelectionModal({ isVisible, onClose, onApplyFilter, 
       </View>
 
       {showClearButton && (
-        <PulsateButton onPress={handleClearFilter} style={styles.clearButton}>
+        <PulsateButton
+          onPress={handleClearFilter}
+          style={[styles.clearButton, { marginBottom: safeAreaInsets.bottom + 8 }]}
+        >
           <Text style={styles.clearButtonText}>Clear Filter</Text>
         </PulsateButton>
       )}
@@ -279,5 +300,11 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: "bold",
     fontSize: 16,
+  },
+  emptyText: {
+    color: COLORS.gray,
+    textAlign: "center",
+    marginTop: 20,
+    paddingHorizontal: 12,
   },
 });

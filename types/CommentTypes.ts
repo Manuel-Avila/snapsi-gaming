@@ -1,8 +1,10 @@
 export type IComment = {
   id: number;
+  local_id?: string;
   comment_text: string;
   created_at: string;
   is_optimistic?: boolean;
+  sync_status?: 'synced' | 'pending' | 'failed';
   user: {
     id: number;
     name: string;
@@ -13,7 +15,7 @@ export type IComment = {
 
 export type IGetCommentsResponse = {
   comments: IComment[];
-  nextCursor: string | null;
+  nextCursor: string | number | null;
 };
 
 export type IAddCommentData = {

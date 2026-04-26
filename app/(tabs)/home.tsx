@@ -3,20 +3,19 @@ import NoItems from "@/components/NoItems";
 import Post from "@/components/Post";
 import PulsateButton from "@/components/ui/PulsateButton";
 import { COLORS } from "@/constants/theme";
-import { useAuth } from "@/context/AuthContext";
-import { usePost } from "@/hooks/usePost";
+import { useOffline } from "@/context/OfflineContext";
+import { getPostsFromDb } from "@/hooks/useOfflinePosts";
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router/build/hooks";
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, View, Image as RNImage } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { FlatList, RefreshControl } from "react-native-gesture-handler";
 import { useInfiniteQuery } from "react-query";
 import GameSelectionModal from "@/components/Modals/GameSelectionModal";
 
 export default function Home() {
-  const { logout } = useAuth();
-  const { getPosts } = usePost();
+  const { triggerSync, isDbReady } = useOffline();
   const flatListRef = useRef<FlatList>(null);
   const router = useRouter();
   const { scrollToTop } = useLocalSearchParams();
@@ -39,15 +38,17 @@ export default function Home() {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-  } = useInfiniteQuery(["posts", filter || {}], getPosts, {
+  } = useInfiniteQuery(["posts", filter || {}], getPostsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     refetchOnWindowFocus: false,
+    enabled: isDbReady,
   });
 
   const posts = data?.pages.flatMap((page) => page.posts) ?? [];
 
   const handleRefresh = async () => {
     setIsManuallyRefreshing(true);
+    await triggerSync();
     await refetch();
     setIsManuallyRefreshing(false);
   };
@@ -73,7 +74,7 @@ export default function Home() {
           ref={flatListRef}
           data={posts}
           renderItem={({ item }) => <Post post={item} />}
-          keyExtractor={(item) => JSON.stringify(item.id)}
+          keyExtractor={(item) => item.local_id || String(item.id)}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.postsContainer}

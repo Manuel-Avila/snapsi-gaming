@@ -15,9 +15,7 @@ export default function Comment({
   onClose: () => void;
 }) {
   return (
-    <View
-      style={[styles.container, comment.is_optimistic && styles.optimistic]}
-    >
+    <View style={styles.container}>
       <Link href={`/user/${comment.user.username}`} asChild>
         <PulsateButton onPress={onClose}>
           <Image
@@ -48,9 +46,6 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     gap: 10,
-  },
-  optimistic: {
-    opacity: 0.6,
   },
   profileImage: {
     width: 30,
