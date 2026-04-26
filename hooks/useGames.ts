@@ -29,7 +29,6 @@ export const useGames = () => {
 
         return response.data;
       } catch {
-        // Fall back to local cache
       }
     }
 
@@ -56,7 +55,6 @@ export const useGames = () => {
 
         return response.data;
       } catch {
-        // Fall back to local cache
       }
     }
 
@@ -73,7 +71,6 @@ export const useGames = () => {
         }
         return response.data;
       } catch {
-        // Fall back to local cache
       }
     }
 

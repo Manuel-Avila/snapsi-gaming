@@ -20,5 +20,6 @@ export type IGetCommentsResponse = {
 
 export type IAddCommentData = {
   postId: number;
+  postLocalId?: string;
   comment_text: string;
 };

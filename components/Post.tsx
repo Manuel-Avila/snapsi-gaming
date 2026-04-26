@@ -191,6 +191,7 @@ export default function Post({ post, openComments }: Props) {
         isVisible={showComments}
         onClose={() => setShowComments(false)}
         postId={post.id}
+        postLocalId={post.local_id || `server_${post.id}`}
       />
       <ConfirmationModal
         isVisible={showConfirmationModal}

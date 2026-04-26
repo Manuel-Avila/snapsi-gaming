@@ -29,9 +29,10 @@ type props = {
   isVisible: boolean;
   onClose: () => void;
   postId: number;
+  postLocalId?: string;
 };
 
-export default function CommentsModal({ isVisible, onClose, postId }: props) {
+export default function CommentsModal({ isVisible, onClose, postId, postLocalId }: props) {
   const safeAreaInsets = useSafeAreaInsets();
   const { isDbReady } = useOffline();
   const [comment, setComment] = useState("");
@@ -49,7 +50,7 @@ export default function CommentsModal({ isVisible, onClose, postId }: props) {
     isFetchingNextPage,
     isLoading,
     isFetching,
-  } = useInfiniteQuery(["comments", postId], getCommentsFromDb, {
+  } = useInfiniteQuery(["comments", { postId, postLocalId }], getCommentsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!postId && isVisible && isDbReady,
     refetchOnWindowFocus: false,
@@ -61,6 +62,7 @@ export default function CommentsModal({ isVisible, onClose, postId }: props) {
 
     const formData = {
       postId,
+      postLocalId,
       comment_text: comment.trim(),
     };
 

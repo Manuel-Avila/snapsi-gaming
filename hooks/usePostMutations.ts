@@ -37,38 +37,47 @@ type IDeleteContext = {
   previousProfile: IUserProfile | undefined;
 };
 
-// Generate a simple unique ID without external deps
 const generateLocalId = (): string =>
   `local_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+const hasServerPostId = (postData: { localId: string; postId?: number }): boolean =>
+  Boolean(
+    postData.postId &&
+      Number.isInteger(postData.postId) &&
+      postData.postId > 0 &&
+      !postData.localId.startsWith("local_")
+  );
 
 export const usePostMutations = () => {
   const queryClient = useQueryClient();
   const {
+    deletePost,
     likePost,
     unlikePost,
     bookmarkPost,
     unbookmarkPost,
   } = usePost();
 
-  // -----------------------------------------------------------------------
-  // Helper: Optimistic modify (like/unlike/bookmark/unbookmark)
-  // -----------------------------------------------------------------------
   const optimisticModifyPostUpdate = (
     action: string,
     updateFn: (post: IPost) => IPost,
     syncOperation: "like" | "unlike" | "bookmark" | "unbookmark"
   ) => ({
-    onMutate: async (postData: { localId: string; postId: number }) => {
+    onMutate: async (postData: { localId: string; postId?: number }) => {
       const { localId, postId } = postData;
       await queryClient.cancelQueries(["posts"]);
-      await queryClient.cancelQueries(["post", postId]);
+      if (postId && Number.isInteger(postId)) {
+        await queryClient.cancelQueries(["post", postId]);
+      }
 
-      const previousPost = queryClient.getQueryData<IPost>(["post", postId]);
+      const previousPost =
+        postId && Number.isInteger(postId)
+          ? queryClient.getQueryData<IPost>(["post", postId])
+          : undefined;
       const previousPostLists = queryClient.getQueriesData<InfinitePostsData>([
         "posts",
       ]);
 
-      // Update React Query cache
       if (previousPost) {
         queryClient.setQueryData<IPost>(
           ["post", postId],
@@ -96,7 +105,6 @@ export const usePostMutations = () => {
         }
       );
 
-      // Update SQLite
       try {
         if (syncOperation === "like") {
           await PostRepo.toggleLike(localId, true);
@@ -115,11 +123,11 @@ export const usePostMutations = () => {
     },
     onError: (
       error: unknown,
-      postData: { localId: string; postId: number },
+      postData: { localId: string; postId?: number },
       context: IModifyContext | undefined
     ) => {
       showToastErrorOnAction(action);
-      if (context?.previousPost) {
+      if (context?.previousPost && postData.postId) {
         queryClient.setQueryData(["post", postData.postId], context.previousPost);
       }
       context?.previousPostLists?.forEach(
@@ -132,49 +140,61 @@ export const usePostMutations = () => {
   });
 
   const runOrQueuePostInteraction = async (
-    postData: { localId: string; postId: number },
+    postData: { localId: string; postId?: number },
     syncOperation: "like" | "unlike" | "bookmark" | "unbookmark"
   ) => {
-    if (!postData.postId || typeof postData.postId !== "number") {
+    const serverBackedPost = hasServerPostId(postData);
+
+    if (!serverBackedPost) {
+      await SyncQueue.replacePendingPostInteraction(
+        syncOperation,
+        undefined,
+        postData.localId
+      );
       return;
     }
 
     const callApi = async () => {
+      const targetPostId = postData.postId as number;
       if (syncOperation === "like") {
-        await likePost(postData.postId);
+        await likePost(targetPostId);
         return;
       }
       if (syncOperation === "unlike") {
-        await unlikePost(postData.postId);
+        await unlikePost(targetPostId);
         return;
       }
       if (syncOperation === "bookmark") {
-        await bookmarkPost(postData.postId);
+        await bookmarkPost(targetPostId);
         return;
       }
-      await unbookmarkPost(postData.postId);
+      await unbookmarkPost(targetPostId);
     };
 
     if (!NetworkService.isOnline()) {
-      await SyncQueue.replacePendingPostInteraction(syncOperation, postData.postId);
+      await SyncQueue.replacePendingPostInteraction(
+        syncOperation,
+        postData.postId,
+        postData.localId
+      );
       return;
     }
 
     try {
       await callApi();
     } catch (error: any) {
-      // If request could not reach backend, persist operation for background sync.
       if (!error?.response) {
-        await SyncQueue.replacePendingPostInteraction(syncOperation, postData.postId);
+        await SyncQueue.replacePendingPostInteraction(
+          syncOperation,
+          postData.postId,
+          postData.localId
+        );
         return;
       }
       throw error;
     }
   };
 
-  // -----------------------------------------------------------------------
-  // Create Post — writes to SQLite + enqueues sync
-  // -----------------------------------------------------------------------
   const { mutate: handleCreatePost, isLoading: isCreating } = useMutation({
     mutationFn: async (data: ICreatePostData) => {
       const localId = generateLocalId();
@@ -272,9 +292,6 @@ export const usePostMutations = () => {
     },
   });
 
-  // -----------------------------------------------------------------------
-  // Add Comment — writes to SQLite + enqueues sync
-  // -----------------------------------------------------------------------
   const { mutate: handleAddComment, isLoading: isAddingComment } = useMutation({
     mutationFn: async (data: IAddCommentData) => {
       const localId = generateLocalId();
@@ -283,6 +300,7 @@ export const usePostMutations = () => {
       await CommentRepo.insertLocalComment({
         localId,
         postId: data.postId,
+        postLocalId: data.postLocalId,
         commentText: data.comment_text,
         userId: myProfile?.id ?? 0,
         userName: myProfile?.name ?? "",
@@ -293,20 +311,23 @@ export const usePostMutations = () => {
       await SyncQueue.enqueue("add_comment", {
         localId,
         postId: data.postId,
+        postLocalId: data.postLocalId,
         commentText: data.comment_text,
       });
 
       return { localId };
     },
     onMutate: async (data: IAddCommentData) => {
-      const { postId, comment_text } = data;
-      await queryClient.cancelQueries(["comments", postId]);
+      const { postId, postLocalId, comment_text } = data;
+      const commentsQueryKey: QueryKey = ["comments", { postId, postLocalId }];
+
+      await queryClient.cancelQueries(commentsQueryKey);
       await queryClient.cancelQueries(["post", postId]);
       await queryClient.cancelQueries(["posts"]);
 
       const previousComments = queryClient.getQueryData<InfiniteCommentsData>([
         "comments",
-        postId,
+        { postId, postLocalId },
       ]);
 
       const myProfile = queryClient.getQueryData<IUserProfile>("myProfile");
@@ -324,7 +345,7 @@ export const usePostMutations = () => {
       };
 
       queryClient.setQueryData(
-        ["comments", postId],
+        commentsQueryKey,
         (oldData: InfiniteCommentsData | undefined) => {
           const newData = oldData
             ? { ...oldData, pages: [...oldData.pages] }
@@ -350,28 +371,23 @@ export const usePostMutations = () => {
       newComment: IAddCommentData,
       context: IAddCommentContext | undefined
     ) => {
-      const { postId } = newComment;
+      const { postId, postLocalId } = newComment;
+      const commentsQueryKey: QueryKey = ["comments", { postId, postLocalId }];
       showToastErrorOnAction("adding comment");
       if (context?.previousComments) {
-        queryClient.setQueryData(
-          ["comments", postId],
-          context.previousComments
-        );
+        queryClient.setQueryData(commentsQueryKey, context.previousComments);
       }
     },
     onSettled: (data: unknown, error: unknown, newComment: IAddCommentData) => {
-      const { postId } = newComment;
-      queryClient.invalidateQueries(["comments", postId]);
+      const { postId, postLocalId } = newComment;
+      queryClient.invalidateQueries(["comments", { postId, postLocalId }]);
       queryClient.invalidateQueries(["post", postId]);
       queryClient.invalidateQueries(["posts"]);
     },
   });
 
-  // -----------------------------------------------------------------------
-  // Like / Unlike / Bookmark / Unbookmark
-  // -----------------------------------------------------------------------
   const { mutate: handleLikePost, isLoading: isLiking } = useMutation({
-    mutationFn: async (postData: { localId: string; postId: number }) => {
+    mutationFn: async (postData: { localId: string; postId?: number }) => {
       await runOrQueuePostInteraction(postData, "like");
     },
     ...optimisticModifyPostUpdate("liking", (post) => ({
@@ -382,7 +398,7 @@ export const usePostMutations = () => {
   });
 
   const { mutate: handleUnlikePost, isLoading: isUnliking } = useMutation({
-    mutationFn: async (postData: { localId: string; postId: number }) => {
+    mutationFn: async (postData: { localId: string; postId?: number }) => {
       await runOrQueuePostInteraction(postData, "unlike");
     },
     ...optimisticModifyPostUpdate("unliking", (post) => ({
@@ -393,7 +409,7 @@ export const usePostMutations = () => {
   });
 
   const { mutate: handleBookmarkPost, isLoading: isBookmarking } = useMutation({
-    mutationFn: async (postData: { localId: string; postId: number }) => {
+    mutationFn: async (postData: { localId: string; postId?: number }) => {
       await runOrQueuePostInteraction(postData, "bookmark");
     },
     ...optimisticModifyPostUpdate("bookmarking", (post) => ({
@@ -404,7 +420,7 @@ export const usePostMutations = () => {
 
   const { mutate: handleUnbookmarkPost, isLoading: isUnbookmarking } =
     useMutation({
-      mutationFn: async (postData: { localId: string; postId: number }) => {
+      mutationFn: async (postData: { localId: string; postId?: number }) => {
         await runOrQueuePostInteraction(postData, "unbookmark");
       },
       ...optimisticModifyPostUpdate("unbookmarking", (post) => ({
@@ -413,22 +429,23 @@ export const usePostMutations = () => {
       }), "unbookmark"),
     });
 
-  // -----------------------------------------------------------------------
-  // Delete Post — writes to SQLite + enqueues sync
-  // -----------------------------------------------------------------------
   const { mutate: handleDeletePost, isLoading: isDeleting } = useMutation({
     mutationFn: async (postData: { localId: string; postId?: number }) => {
       const { localId, postId } = postData;
 
-      // Remove from SQLite
+      if (hasServerPostId(postData) && NetworkService.isOnline()) {
+        await deletePost(postId as number);
+        await PostRepo.deletePost(localId);
+        return;
+      }
+
       await PostRepo.deletePost(localId);
 
-      // If the post was synced (has server ID), enqueue deletion
-      if (postId && typeof postId === "number") {
-        await SyncQueue.enqueue("delete_post", { postId });
+      if (hasServerPostId(postData)) {
+        await SyncQueue.enqueue("delete_post", { postId, postLocalId: localId });
       } else {
-        // Post was never synced — just remove from queue
         await SyncQueue.removeByLocalId("create_post", localId);
+        await SyncQueue.removePendingByPostLocalId(localId);
       }
     },
     onMutate: async (postData: { localId: string; postId?: number }) => {
@@ -495,6 +512,9 @@ export const usePostMutations = () => {
     },
     onSettled: (data: unknown, error: unknown, postData: { localId: string; postId?: number }) => {
       queryClient.invalidateQueries(["posts"]);
+      if (postData.postId) {
+        queryClient.invalidateQueries(["post", postData.postId]);
+      }
       queryClient.invalidateQueries("notifications");
       queryClient.invalidateQueries(["myProfile"]);
     },

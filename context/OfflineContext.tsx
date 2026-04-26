@@ -33,7 +33,6 @@ export const OfflineProvider = ({
   const queryClient = useQueryClient();
   const appState = useRef(AppState.currentState);
 
-  // Refresh pending count
   const refreshPendingCount = useCallback(async () => {
     try {
       const count = await SyncQueue.getQueueCount();
@@ -41,7 +40,6 @@ export const OfflineProvider = ({
     } catch {}
   }, []);
 
-  // Invalidate all data queries after sync
   const onSyncComplete = useCallback(() => {
     queryClient.invalidateQueries(["posts"]);
     queryClient.invalidateQueries(["comments"]);
@@ -50,7 +48,6 @@ export const OfflineProvider = ({
     refreshPendingCount();
   }, [queryClient, refreshPendingCount]);
 
-  // Initialize database on mount
   useEffect(() => {
     let mounted = true;
 

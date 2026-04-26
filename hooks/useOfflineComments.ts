@@ -6,19 +6,16 @@ import { QueryFunctionContext } from "react-query/types/core/types";
 
 const PAGE_SIZE = 10;
 
-/**
- * Comments for a post — reads from SQLite with offset pagination.
- * On first call (offset=0), pulls latest from backend if online.
- */
 export const getCommentsFromDb = async ({
   queryKey,
   pageParam = 0,
-}: QueryFunctionContext<[string, number]>): Promise<IGetCommentsResponse> => {
-  const [_key, postId] = queryKey;
+}: QueryFunctionContext<[string, { postId: number; postLocalId?: string }]>): Promise<IGetCommentsResponse> => {
+  const [_key, postRef] = queryKey;
+  const { postId, postLocalId } = postRef;
   const offset = pageParam as number;
+  const isLocalOnlyPost = Boolean(postLocalId && postLocalId.startsWith("local_"));
 
-  // On first page load, pull from backend to populate SQLite
-  if (offset === 0 && NetworkService.isOnline()) {
+  if (offset === 0 && NetworkService.isOnline() && !isLocalOnlyPost) {
     await SyncService.pullComments(postId);
   }
 

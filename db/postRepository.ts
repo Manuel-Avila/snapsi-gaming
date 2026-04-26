@@ -1,10 +1,6 @@
 import { getDatabase } from "./database";
 import type { IPost, IGameTag } from "@/types/PostTypes";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const rowToPost = (row: any): IPost => ({
   id: row.id ?? row.local_id,
   local_id: row.local_id,
@@ -27,9 +23,6 @@ const rowToPost = (row: any): IPost => ({
   sync_status: row.sync_status,
 });
 
-// ---------------------------------------------------------------------------
-// Read
-// ---------------------------------------------------------------------------
 
 export const getPostsPaginated = async (
   limit: number,
@@ -108,9 +101,21 @@ export const getPostByServerId = async (
   return row ? rowToPost(row) : null;
 };
 
-// ---------------------------------------------------------------------------
-// Write
-// ---------------------------------------------------------------------------
+export const getServerPostIdByLocalId = async (
+  localId: string
+): Promise<number | null> => {
+  const db = getDatabase();
+  const row: any = await db.getFirstAsync(
+    `SELECT id FROM posts WHERE local_id = ? LIMIT 1`,
+    [localId]
+  );
+
+  if (!row?.id || !Number.isInteger(row.id)) {
+    return null;
+  }
+
+  return row.id;
+};
 
 export const upsertPost = async (post: IPost): Promise<void> => {
   const db = getDatabase();

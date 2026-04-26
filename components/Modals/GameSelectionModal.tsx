@@ -38,7 +38,6 @@ export default function GameSelectionModal({ isVisible, onClose, onApplyFilter, 
   const { getCategories, searchGames } = useGames();
   const isOnline = NetworkService.isOnline();
 
-  // Debounce search query
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchQuery), 500);
     return () => clearTimeout(handler);

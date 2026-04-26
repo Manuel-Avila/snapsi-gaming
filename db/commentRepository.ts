@@ -1,10 +1,6 @@
 import { getDatabase } from "./database";
 import type { IComment } from "@/types/CommentTypes";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const rowToComment = (row: any): IComment => ({
   id: row.id ?? row.local_id,
   local_id: row.local_id,
@@ -20,9 +16,6 @@ const rowToComment = (row: any): IComment => ({
   sync_status: row.sync_status,
 });
 
-// ---------------------------------------------------------------------------
-// Read
-// ---------------------------------------------------------------------------
 
 export const getCommentsPaginated = async (
   postId: number,
@@ -37,9 +30,6 @@ export const getCommentsPaginated = async (
   return rows.map(rowToComment);
 };
 
-// ---------------------------------------------------------------------------
-// Write
-// ---------------------------------------------------------------------------
 
 export const upsertComment = async (
   comment: IComment,
@@ -114,7 +104,8 @@ export const insertLocalComment = async (comment: {
 export const updateCommentSyncStatus = async (
   localId: string,
   status: "synced" | "pending" | "failed",
-  serverId?: number
+  serverId?: number,
+  postId?: number
 ): Promise<void> => {
   const db = getDatabase();
   if (serverId !== undefined) {
@@ -126,8 +117,10 @@ export const updateCommentSyncStatus = async (
     );
 
     await db.runAsync(
-      `UPDATE comments SET sync_status = ?, id = ?, local_id = ? WHERE local_id = ?`,
-      [status, serverId, serverLocalId, localId]
+      `UPDATE comments
+       SET sync_status = ?, id = ?, local_id = ?, post_id = COALESCE(?, post_id)
+       WHERE local_id = ?`,
+      [status, serverId, serverLocalId, postId ?? null, localId]
     );
   } else {
     await db.runAsync(

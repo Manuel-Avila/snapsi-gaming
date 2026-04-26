@@ -17,14 +17,12 @@ export const initDatabase = async (): Promise<void> => {
   await db.execAsync(`PRAGMA journal_mode = WAL;`);
   await db.execAsync(`PRAGMA foreign_keys = ON;`);
 
-  // Check if schema needs to be rebuilt
   const versionRow: any = await db
     .getFirstAsync(`PRAGMA user_version;`)
     .catch(() => null);
   const currentVersion = versionRow?.user_version ?? 0;
 
   if (currentVersion < SCHEMA_VERSION) {
-    // Drop all old tables and recreate with the correct schema
     await db.execAsync(`DROP TABLE IF EXISTS posts;`);
     await db.execAsync(`DROP TABLE IF EXISTS comments;`);
     await db.execAsync(`DROP TABLE IF EXISTS game_reviews;`);
@@ -127,7 +125,6 @@ export const initDatabase = async (): Promise<void> => {
     );
   `);
 
-  // Keep canonical IDs for synced entities to avoid duplicates after pull.
   await db.execAsync(`
     UPDATE posts
     SET local_id = ('server_' || id)
@@ -194,7 +191,6 @@ export const initDatabase = async (): Promise<void> => {
       );
   `);
 
-  // Update schema version
   if (currentVersion < SCHEMA_VERSION) {
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   }

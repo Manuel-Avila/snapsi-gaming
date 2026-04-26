@@ -1,10 +1,6 @@
 import { getDatabase } from "./database";
 import type { IGameReview } from "@/types/GameTypes";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const rowToReview = (row: any): IGameReview => ({
   id: row.id ?? row.local_id,
   local_id: row.local_id,
@@ -23,9 +19,6 @@ const rowToReview = (row: any): IGameReview => ({
   sync_status: row.sync_status,
 });
 
-// ---------------------------------------------------------------------------
-// Read
-// ---------------------------------------------------------------------------
 
 export const getReviewsByUsername = async (
   username: string,
@@ -52,9 +45,6 @@ export const getReviewsByUsername = async (
   return Array.from(uniqueByGameId.values());
 };
 
-// ---------------------------------------------------------------------------
-// Write
-// ---------------------------------------------------------------------------
 
 export const upsertReview = async (review: IGameReview): Promise<void> => {
   const db = getDatabase();
@@ -67,12 +57,10 @@ export const upsertReview = async (review: IGameReview): Promise<void> => {
     [review.user.id, review.game_id]
   );
 
-  // Never overwrite local pending edits with pulled server data.
   if (pendingRow && pendingRow.local_id !== localId) {
     return;
   }
 
-  // Keep a single non-pending row per user/game in local cache.
   await db.runAsync(
     `DELETE FROM game_reviews
      WHERE user_id = ?
@@ -140,7 +128,6 @@ export const insertLocalReview = async (review: {
 }): Promise<void> => {
   const db = getDatabase();
 
-  // Delete any previous review for this game by same user, regardless of sync status.
   await db.runAsync(
     `DELETE FROM game_reviews WHERE user_id = ? AND game_id = ?`,
     [review.userId, review.gameId]

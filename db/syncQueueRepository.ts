@@ -14,7 +14,7 @@ export type SyncOperation =
 export type SyncQueueItem = {
   id: number;
   operation: SyncOperation;
-  payload: string; // JSON string
+  payload: string;
   status: "pending" | "in_progress" | "failed";
   retry_count: number;
   max_retries: number;
@@ -22,10 +22,6 @@ export type SyncQueueItem = {
   last_attempted_at: string | null;
   error_message: string | null;
 };
-
-// ---------------------------------------------------------------------------
-// Queue Operations
-// ---------------------------------------------------------------------------
 
 export const enqueue = async (
   operation: SyncOperation,
@@ -101,7 +97,8 @@ export const removeByLocalId = async (
 
 export const replacePendingPostInteraction = async (
   operation: "like" | "unlike" | "bookmark" | "unbookmark",
-  postId: number
+  postId?: number,
+  postLocalId?: string
 ): Promise<void> => {
   const db = getDatabase();
   const isLikeOperation = operation === "like" || operation === "unlike";
@@ -109,19 +106,89 @@ export const replacePendingPostInteraction = async (
     ? ["like", "unlike"]
     : ["bookmark", "unbookmark"];
 
-  await db.runAsync(
-    `DELETE FROM sync_queue
-     WHERE operation IN (?, ?)
-       AND status IN ('pending', 'failed')
-       AND payload LIKE ?`,
-    [relatedOperations[0], relatedOperations[1], `%\"postId\":${postId}%`]
-  );
+  if (postId && Number.isInteger(postId)) {
+    await db.runAsync(
+      `DELETE FROM sync_queue
+       WHERE operation IN (?, ?)
+         AND status IN ('pending', 'failed')
+         AND payload LIKE ?`,
+      [relatedOperations[0], relatedOperations[1], `%\"postId\":${postId}%`]
+    );
+  }
+
+  if (postLocalId) {
+    await db.runAsync(
+      `DELETE FROM sync_queue
+       WHERE operation IN (?, ?)
+         AND status IN ('pending', 'failed')
+         AND payload LIKE ?`,
+      [
+        relatedOperations[0],
+        relatedOperations[1],
+        `%\"postLocalId\":\"${postLocalId}\"%`,
+      ]
+    );
+  }
+
+  const payload: Record<string, any> = {};
+  if (postId && Number.isInteger(postId)) {
+    payload.postId = postId;
+  }
+  if (postLocalId) {
+    payload.postLocalId = postLocalId;
+  }
 
   await db.runAsync(
     `INSERT INTO sync_queue (operation, payload, status, created_at)
      VALUES (?, ?, 'pending', ?)`,
-    [operation, JSON.stringify({ postId }), new Date().toISOString()]
+    [operation, JSON.stringify(payload), new Date().toISOString()]
   );
+};
+
+export const removePendingByPostLocalId = async (
+  postLocalId: string
+): Promise<void> => {
+  const db = getDatabase();
+  await db.runAsync(
+    `DELETE FROM sync_queue
+     WHERE status IN ('pending', 'failed', 'in_progress')
+       AND payload LIKE ?`,
+    [`%\"postLocalId\":\"${postLocalId}\"%`]
+  );
+};
+
+export const retargetPostReferencesAfterSync = async (
+  oldLocalId: string,
+  newLocalId: string,
+  serverId: number
+): Promise<void> => {
+  const db = getDatabase();
+  const rows = (await db.getAllAsync(
+    `SELECT id, payload
+     FROM sync_queue
+     WHERE status IN ('pending', 'failed')
+       AND payload LIKE ?`,
+    [`%\"postLocalId\":\"${oldLocalId}\"%`]
+  )) as Array<{ id: number; payload: string }>;
+
+  for (const row of rows) {
+    try {
+      const payload = JSON.parse(row.payload);
+      if (payload.postLocalId !== oldLocalId) {
+        continue;
+      }
+
+      payload.postLocalId = newLocalId;
+      payload.postId = serverId;
+
+      await db.runAsync(`UPDATE sync_queue SET payload = ? WHERE id = ?`, [
+        JSON.stringify(payload),
+        row.id,
+      ]);
+    } catch {
+      continue;
+    }
+  }
 };
 
 export const removePendingReviewByGameId = async (

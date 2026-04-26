@@ -80,7 +80,6 @@ export default function ReviewModal({
         userProfilePictureUrl: myProfile.profile_picture_url ?? "",
       });
 
-      // Keep only the latest pending review change for this game.
       await SyncQueue.removePendingReviewByGameId(data.game_id, myProfile.id);
 
       await SyncQueue.enqueue("create_review", {

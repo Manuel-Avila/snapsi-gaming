@@ -49,7 +49,6 @@ export default function Games() {
   } = useInfiniteQuery(["gamesSearchInfinite", debouncedSearch], searchGamesInfinite, {
     getNextPageParam: (lastPage) => {
       if (lastPage.next) {
-        // Extract page number from URL
         const match = lastPage.next.match(/page=(\d+)/);
         if (match) {
           return parseInt(match[1], 10);

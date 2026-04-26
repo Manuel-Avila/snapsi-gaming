@@ -6,10 +6,6 @@ import { QueryFunctionContext } from "react-query/types/core/types";
 
 const PAGE_SIZE = 10;
 
-/**
- * Feed posts — reads from SQLite with offset pagination.
- * Used as queryFn for useInfiniteQuery.
- */
 export const getPostsFromDb = async ({
   queryKey,
   pageParam = 0,
@@ -21,7 +17,6 @@ export const getPostsFromDb = async ({
 
   const posts = await PostRepo.getPostsPaginated(PAGE_SIZE, offset, filters);
 
-  // If we got fewer posts than page size and we're online, try pulling more from backend
   if (posts.length < PAGE_SIZE && NetworkService.isOnline() && offset === 0) {
     try {
       await SyncService.runPullOnly();
@@ -36,7 +31,6 @@ export const getPostsFromDb = async ({
           refreshedPosts.length === PAGE_SIZE ? offset + PAGE_SIZE : null,
       };
     } catch {
-      // Fall through to return what we have
     }
   }
 
@@ -46,10 +40,6 @@ export const getPostsFromDb = async ({
   };
 };
 
-/**
- * User profile posts — reads from SQLite.
- * Pulls from backend on first page if online.
- */
 export const getUserPostsFromDb = async ({
   queryKey,
   pageParam = 0,
@@ -57,7 +47,6 @@ export const getUserPostsFromDb = async ({
   const [_key, username] = queryKey;
   const offset = pageParam as number;
 
-  // Pull from backend on first page
   if (offset === 0 && NetworkService.isOnline()) {
     await SyncService.pullUserPosts(username);
   }
@@ -70,16 +59,11 @@ export const getUserPostsFromDb = async ({
   };
 };
 
-/**
- * Bookmarked posts — reads from SQLite.
- * Pulls from backend on first page if online.
- */
 export const getBookmarkedPostsFromDb = async ({
   pageParam = 0,
 }: QueryFunctionContext): Promise<IGetPostsResponse> => {
   const offset = pageParam as number;
 
-  // Pull from backend on first page
   if (offset === 0 && NetworkService.isOnline()) {
     await SyncService.pullBookmarkedPosts();
   }

@@ -12,17 +12,9 @@ let _isSyncing = false;
 let _syncInterval: ReturnType<typeof setInterval> | null = null;
 let _onSyncComplete: (() => void) | null = null;
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
-const RETRY_DELAYS = [5000, 15000, 30000, 60000, 60000]; // ms per retry
+const RETRY_DELAYS = [5000, 15000, 30000, 60000, 60000];
 const PULL_BATCH_SIZE = 50;
 const POST_CACHE_LIMIT = 100;
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export const setSyncCompleteCallback = (cb: () => void) => {
   _onSyncComplete = cb;
@@ -74,10 +66,6 @@ export const runPullOnly = async (): Promise<void> => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// PUSH — Local → Backend
-// ---------------------------------------------------------------------------
-
 const pushChanges = async (): Promise<void> => {
   if (!(await hasAccessToken())) return;
   await SyncQueue.resetInProgressToRetry();
@@ -86,7 +74,6 @@ const pushChanges = async (): Promise<void> => {
   for (const op of operations) {
     if (!NetworkService.isOnline()) break;
 
-    // Respect retry delay
     if (op.retry_count > 0 && op.last_attempted_at) {
       const delay = RETRY_DELAYS[Math.min(op.retry_count - 1, RETRY_DELAYS.length - 1)];
       const elapsed = Date.now() - new Date(op.last_attempted_at).getTime();
@@ -125,16 +112,16 @@ const processOperation = async (op: SyncQueueItem): Promise<void> => {
       await pushDeletePost(payload);
       break;
     case "like":
-      await api.post(`/posts/${payload.postId}/like`);
+      await pushLike(payload);
       break;
     case "unlike":
-      await api.delete(`/posts/${payload.postId}/like`);
+      await pushUnlike(payload);
       break;
     case "bookmark":
-      await api.post(`/posts/${payload.postId}/bookmark`);
+      await pushBookmark(payload);
       break;
     case "unbookmark":
-      await api.delete(`/posts/${payload.postId}/bookmark`);
+      await pushUnbookmark(payload);
       break;
     case "add_comment":
       await pushAddComment(payload);
@@ -180,24 +167,74 @@ const pushCreatePost = async (payload: any): Promise<void> => {
     serverPost.image_url,
     serverPost.image_cloudinary_id
   );
+
+  await SyncQueue.retargetPostReferencesAfterSync(
+    localId,
+    `server_${serverPost.id}`,
+    serverPost.id
+  );
 };
 
 const pushDeletePost = async (payload: any): Promise<void> => {
-  const { postId } = payload;
-  if (postId) {
-    await api.delete(`/posts/${postId}`);
+  const targetPostId = await resolvePostIdFromPayload(payload);
+  if (!targetPostId) {
+    throw new Error("Post not synced yet");
   }
+
+  await api.delete(`/posts/${targetPostId}`);
 };
 
 const pushAddComment = async (payload: any): Promise<void> => {
-  const { localId, postId, commentText } = payload;
+  const { localId, commentText } = payload;
+  const targetPostId = await resolvePostIdFromPayload(payload);
 
-  const response = await api.post(`/posts/${postId}/comments`, {
+  if (!targetPostId) {
+    throw new Error("Post not synced yet");
+  }
+
+  const response = await api.post(`/posts/${targetPostId}/comments`, {
     comment_text: commentText,
   });
 
   const serverComment = response.data.comment;
-  await CommentRepo.updateCommentSyncStatus(localId, "synced", serverComment.id);
+  await CommentRepo.updateCommentSyncStatus(
+    localId,
+    "synced",
+    serverComment.id,
+    targetPostId
+  );
+};
+
+const pushLike = async (payload: any): Promise<void> => {
+  const targetPostId = await resolvePostIdFromPayload(payload);
+  if (!targetPostId) {
+    throw new Error("Post not synced yet");
+  }
+  await api.post(`/posts/${targetPostId}/like`);
+};
+
+const pushUnlike = async (payload: any): Promise<void> => {
+  const targetPostId = await resolvePostIdFromPayload(payload);
+  if (!targetPostId) {
+    throw new Error("Post not synced yet");
+  }
+  await api.delete(`/posts/${targetPostId}/like`);
+};
+
+const pushBookmark = async (payload: any): Promise<void> => {
+  const targetPostId = await resolvePostIdFromPayload(payload);
+  if (!targetPostId) {
+    throw new Error("Post not synced yet");
+  }
+  await api.post(`/posts/${targetPostId}/bookmark`);
+};
+
+const pushUnbookmark = async (payload: any): Promise<void> => {
+  const targetPostId = await resolvePostIdFromPayload(payload);
+  if (!targetPostId) {
+    throw new Error("Post not synced yet");
+  }
+  await api.delete(`/posts/${targetPostId}/bookmark`);
 };
 
 const pushCreateReview = async (payload: any): Promise<void> => {
@@ -252,14 +289,9 @@ const pushUpdateProfile = async (payload: any): Promise<void> => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// PULL — Backend → Local
-// ---------------------------------------------------------------------------
-
 const pullPosts = async (): Promise<void> => {
   if (!(await hasAccessToken())) return;
   try {
-    // Pull latest posts (no cursor — always get latest for simplicity)
     const response = await api.get("/posts", {
       params: { limit: PULL_BATCH_SIZE },
     });
@@ -269,17 +301,11 @@ const pullPosts = async (): Promise<void> => {
       await PostRepo.upsertPosts(posts);
     }
 
-    // Prune to keep only the cache limit
     await PostRepo.pruneOldPosts(POST_CACHE_LIMIT);
   } catch (error) {
     console.warn("[SyncService] Pull posts failed:", error);
   }
 };
-
-/**
- * Pull comments for a specific post from backend and cache in SQLite.
- * Called when CommentsModal opens.
- */
 export const pullComments = async (postId: number): Promise<void> => {
   if (!NetworkService.isOnline()) return;
   if (!(await hasAccessToken())) return;
@@ -296,10 +322,6 @@ export const pullComments = async (postId: number): Promise<void> => {
   }
 };
 
-/**
- * Pull reviews for a user from backend and cache in SQLite.
- * Called when profile ratings tab is viewed.
- */
 export const pullUserReviews = async (username: string): Promise<void> => {
   if (!NetworkService.isOnline()) return;
   if (!(await hasAccessToken())) return;
@@ -316,9 +338,6 @@ export const pullUserReviews = async (username: string): Promise<void> => {
   }
 };
 
-/**
- * Pull posts for a specific user and cache in SQLite.
- */
 export const pullUserPosts = async (username: string): Promise<void> => {
   if (!NetworkService.isOnline()) return;
   if (!(await hasAccessToken())) return;
@@ -335,9 +354,6 @@ export const pullUserPosts = async (username: string): Promise<void> => {
   }
 };
 
-/**
- * Pull bookmarked posts and cache in SQLite.
- */
 export const pullBookmarkedPosts = async (): Promise<void> => {
   if (!NetworkService.isOnline()) return;
   if (!(await hasAccessToken())) return;
@@ -354,13 +370,26 @@ export const pullBookmarkedPosts = async (): Promise<void> => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const hasAccessToken = async (): Promise<boolean> => {
   const token = await SecureStore.getItemAsync("access_token");
   return Boolean(token);
+};
+
+const resolvePostIdFromPayload = async (
+  payload: Record<string, any>
+): Promise<number | null> => {
+  if (payload.postId && Number.isInteger(payload.postId) && payload.postId > 0) {
+    return payload.postId;
+  }
+
+  if (typeof payload.postLocalId === "string" && payload.postLocalId.length > 0) {
+    const serverId = await PostRepo.getServerPostIdByLocalId(payload.postLocalId);
+    if (serverId) {
+      return serverId;
+    }
+  }
+
+  return null;
 };
 
 const formatOperation = (op: string): string => {

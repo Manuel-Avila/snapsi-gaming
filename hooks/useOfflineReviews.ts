@@ -11,10 +11,6 @@ type ReviewsResponse = {
   nextCursor: number | null;
 };
 
-/**
- * User reviews — reads from SQLite with offset pagination.
- * On first page, pulls from backend if online to populate cache.
- */
 export const getUserReviewsFromDb = async ({
   queryKey,
   pageParam = 0,
@@ -22,7 +18,6 @@ export const getUserReviewsFromDb = async ({
   const [_key, username] = queryKey;
   const offset = pageParam as number;
 
-  // On first page load, pull from backend
   if (offset === 0 && NetworkService.isOnline()) {
     await SyncService.pullUserReviews(username);
   }
