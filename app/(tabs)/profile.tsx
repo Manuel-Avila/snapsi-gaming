@@ -39,7 +39,7 @@ export default function Profile() {
   } = useInfiniteQuery(["posts", myProfile?.username || ""], getUserPostsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!myProfile?.username && isDbReady,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 
   const {
@@ -53,7 +53,7 @@ export default function Profile() {
   } = useInfiniteQuery(["gameReviews", myProfile?.username || ""], getUserReviewsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!myProfile?.username && activeTab === "ratings" && isDbReady,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 
   const handleRefetch = async () => {

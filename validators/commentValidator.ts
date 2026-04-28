@@ -8,6 +8,5 @@ export const addCommentSchema = Yup.object().shape({
     .required("comment_text is required."),
   postId: Yup.number()
     .integer("postId must be an integer")
-    .positive("postId must be a positive number")
     .required("postId is required"),
 });

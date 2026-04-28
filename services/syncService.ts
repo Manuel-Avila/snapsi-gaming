@@ -11,6 +11,7 @@ import * as SecureStore from "expo-secure-store";
 let _isSyncing = false;
 let _syncInterval: ReturnType<typeof setInterval> | null = null;
 let _onSyncComplete: (() => void) | null = null;
+const _syncedPostIdsByLocalId = new Map<string, number>();
 
 const RETRY_DELAYS = [5000, 15000, 30000, 60000, 60000];
 const PULL_BATCH_SIZE = 50;
@@ -160,12 +161,19 @@ const pushCreatePost = async (payload: any): Promise<void> => {
   });
 
   const serverPost = response.data.post;
+  _syncedPostIdsByLocalId.set(localId, serverPost.id);
   await PostRepo.updatePostSyncStatus(
     localId,
     "synced",
     serverPost.id,
     serverPost.image_url,
     serverPost.image_cloudinary_id
+  );
+
+  await CommentRepo.retargetCommentsAfterPostSync(
+    localId,
+    `server_${serverPost.id}`,
+    serverPost.id
   );
 
   await SyncQueue.retargetPostReferencesAfterSync(
@@ -383,6 +391,11 @@ const resolvePostIdFromPayload = async (
   }
 
   if (typeof payload.postLocalId === "string" && payload.postLocalId.length > 0) {
+    const syncedPostId = _syncedPostIdsByLocalId.get(payload.postLocalId);
+    if (syncedPostId) {
+      return syncedPostId;
+    }
+
     const serverId = await PostRepo.getServerPostIdByLocalId(payload.postLocalId);
     if (serverId) {
       return serverId;

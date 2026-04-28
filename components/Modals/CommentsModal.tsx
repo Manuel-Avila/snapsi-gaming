@@ -53,7 +53,7 @@ export default function CommentsModal({ isVisible, onClose, postId, postLocalId 
   } = useInfiniteQuery(["comments", { postId, postLocalId }], getCommentsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!postId && isVisible && isDbReady,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
   const comments = data?.pages.flatMap((page) => page.comments ?? []);
 

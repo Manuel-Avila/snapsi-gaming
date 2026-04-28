@@ -1,4 +1,5 @@
 import api from "@/api/apiClient";
+import * as PostRepo from "@/db/postRepository";
 import type { IAddCommentData } from "@/types/CommentTypes";
 import type { IGetPostsResponse, ICreatePostData } from "@/types/PostTypes";
 import { QueryFunctionContext } from "react-query/types/core/types";
@@ -88,6 +89,13 @@ export const usePost = () => {
     return response.data?.post;
   };
 
+  const getPostByLocalId = async ({
+    queryKey,
+  }: QueryFunctionContext<[string, string]>) => {
+    const [_key, localId] = queryKey;
+    return PostRepo.getPostByLocalId(localId);
+  };
+
   const getComments = async ({
     queryKey,
     pageParam,
@@ -142,6 +150,7 @@ export const usePost = () => {
     addComment,
     getUserPosts,
     getPostById,
+    getPostByLocalId,
     getBookmarkedPosts,
   };
 };

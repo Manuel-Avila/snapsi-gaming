@@ -130,6 +130,20 @@ export const updateCommentSyncStatus = async (
   }
 };
 
+export const retargetCommentsAfterPostSync = async (
+  oldPostLocalId: string,
+  newPostLocalId: string,
+  serverPostId: number
+): Promise<void> => {
+  const db = getDatabase();
+  await db.runAsync(
+    `UPDATE comments
+     SET post_id = ?, post_local_id = ?
+     WHERE post_local_id = ?`,
+    [serverPostId, newPostLocalId, oldPostLocalId]
+  );
+};
+
 export const deleteCommentsByPostId = async (
   postId: number
 ): Promise<void> => {

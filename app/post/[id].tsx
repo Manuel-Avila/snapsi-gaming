@@ -6,21 +6,43 @@ import { COLORS } from "@/constants/theme";
 import { usePost } from "@/hooks/usePost";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useQuery } from "react-query";
 
 export default function PostScreen() {
   const router = useRouter();
-  const { id: idString, openComments } = useLocalSearchParams();
+  const { id: idString, localId: localIdParam, openComments } = useLocalSearchParams();
+  const localId =
+    typeof localIdParam === "string"
+      ? localIdParam
+      : localIdParam?.[0];
   const id = Number(idString);
-  const { getPostById } = usePost();
+  const validServerId = Number.isInteger(id) && id > 0 ? id : undefined;
+  const { getPostById, getPostByLocalId } = usePost();
+  const postQueryKey = validServerId
+    ? (["post", validServerId] as const)
+    : (["post-local", localId ?? ""] as const);
   const {
     data: post,
     isLoading,
     error,
-  } = useQuery(["post", id], getPostById, {
-    enabled: !!id,
-  });
+  } = useQuery(
+    postQueryKey,
+    validServerId ? getPostById : getPostByLocalId,
+    {
+      enabled: Boolean(validServerId || localId),
+    }
+  );
+
+  useEffect(() => {
+    if (!validServerId && localId && post?.id && post.id > 0) {
+      router.replace({
+        pathname: "/post/[id]",
+        params: { id: String(post.id), openComments },
+      });
+    }
+  }, [localId, openComments, post?.id, router, validServerId]);
 
   if (isLoading) {
     return (

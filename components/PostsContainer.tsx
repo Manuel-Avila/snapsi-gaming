@@ -59,7 +59,10 @@ export default function PostsContainer({
         numColumns={numColumns}
         renderItem={({ item }) => (
           <Link
-            href={{ pathname: "/post/[id]", params: { id: item.id } }}
+            href={{
+              pathname: "/post/[id]",
+              params: { id: item.id, localId: item.local_id },
+            }}
             asChild
           >
             <TouchableOpacity activeOpacity={0.8}>

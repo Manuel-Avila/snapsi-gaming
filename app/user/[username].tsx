@@ -72,7 +72,7 @@ export default function Profile() {
   } = useInfiniteQuery(["gameReviews", username], getUserReviewsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!username && activeTab === "ratings" && isDbReady,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 
   const handleRefetch = async () => {

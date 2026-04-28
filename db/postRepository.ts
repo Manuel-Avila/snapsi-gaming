@@ -1,8 +1,28 @@
 import { getDatabase } from "./database";
 import type { IPost, IGameTag } from "@/types/PostTypes";
 
+const localIdToTempNumericId = (localId: string): number => {
+  const match = localId.match(/^local_(\d+)/);
+  if (match) {
+    const timestamp = Number(match[1]);
+    if (Number.isFinite(timestamp) && timestamp > 0) {
+      return -timestamp;
+    }
+  }
+
+  let hash = 0;
+  for (let i = 0; i < localId.length; i += 1) {
+    hash = (hash * 31 + localId.charCodeAt(i)) | 0;
+  }
+  const normalized = Math.abs(hash) || 1;
+  return -normalized;
+};
+
 const rowToPost = (row: any): IPost => ({
-  id: row.id ?? row.local_id,
+  id:
+    typeof row.id === "number" && Number.isInteger(row.id)
+      ? row.id
+      : localIdToTempNumericId(row.local_id),
   local_id: row.local_id,
   image_url: row.image_url,
   image_cloudinary_id: row.image_cloudinary_id ?? "",

@@ -40,6 +40,23 @@ type IDeleteContext = {
 const generateLocalId = (): string =>
   `local_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
+const localIdToTempNumericId = (localId: string): number => {
+  const match = localId.match(/^local_(\d+)/);
+  if (match) {
+    const timestamp = Number(match[1]);
+    if (Number.isFinite(timestamp) && timestamp > 0) {
+      return -timestamp;
+    }
+  }
+
+  let hash = 0;
+  for (let i = 0; i < localId.length; i += 1) {
+    hash = (hash * 31 + localId.charCodeAt(i)) | 0;
+  }
+  const normalized = Math.abs(hash) || 1;
+  return -normalized;
+};
+
 const hasServerPostId = (postData: { localId: string; postId?: number }): boolean =>
   Boolean(
     postData.postId &&
@@ -197,7 +214,9 @@ export const usePostMutations = () => {
 
   const { mutate: handleCreatePost, isLoading: isCreating } = useMutation({
     mutationFn: async (data: ICreatePostData) => {
-      const localId = generateLocalId();
+      const localId =
+        (data as ICreatePostData & { __localId?: string }).__localId ??
+        generateLocalId();
       const myProfile = queryClient.getQueryData<IUserProfile>("myProfile");
 
       await PostRepo.insertLocalPost({
@@ -224,6 +243,11 @@ export const usePostMutations = () => {
       await queryClient.cancelQueries(["posts"]);
       await queryClient.cancelQueries(["myProfile"]);
 
+      const mutableData = data as ICreatePostData & { __localId?: string };
+      const localId = mutableData.__localId ?? generateLocalId();
+      mutableData.__localId = localId;
+      const tempPostId = localIdToTempNumericId(localId);
+
       const previousPostList = queryClient.getQueryData<InfinitePostsData>([
         "posts",
       ]);
@@ -234,7 +258,8 @@ export const usePostMutations = () => {
       }
 
       const fakePost: IPost = {
-        id: Math.random(),
+        id: tempPostId,
+        local_id: localId,
         image_url: data.imageUri,
         image_cloudinary_id: "fake_id",
         caption: data.caption,

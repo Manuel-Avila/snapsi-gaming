@@ -20,7 +20,7 @@ export default function Notifications() {
     isLoading,
   } = useInfiniteQuery("notifications", getMyNotifications, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     refetchInterval: 1000 * 60 * 2,
   });
 

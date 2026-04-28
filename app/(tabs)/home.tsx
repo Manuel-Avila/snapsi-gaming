@@ -40,7 +40,7 @@ export default function Home() {
     isLoading,
   } = useInfiniteQuery(["posts", filter || {}], getPostsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     enabled: isDbReady,
   });
 

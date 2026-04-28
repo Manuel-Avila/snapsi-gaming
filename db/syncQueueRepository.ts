@@ -39,7 +39,7 @@ export const getPendingOperations = async (): Promise<SyncQueueItem[]> => {
   const rows = await db.getAllAsync(
     `SELECT * FROM sync_queue
      WHERE (status = 'pending' OR (status = 'failed' AND retry_count < max_retries))
-     ORDER BY created_at ASC`
+      ORDER BY created_at ASC, id ASC`
   );
   return rows as SyncQueueItem[];
 };
