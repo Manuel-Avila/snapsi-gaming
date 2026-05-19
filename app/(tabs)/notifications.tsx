@@ -21,7 +21,7 @@ export default function Notifications() {
   } = useInfiniteQuery("notifications", getMyNotifications, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     refetchOnWindowFocus: true,
-    refetchInterval: 2000,
+    refetchInterval: 1000,
   });
 
   const notifications = data?.pages.flatMap((page) => page.notifications) ?? [];

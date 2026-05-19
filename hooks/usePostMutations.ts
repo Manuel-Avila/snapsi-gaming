@@ -30,6 +30,8 @@ type ICreateContext = {
 };
 type IAddCommentContext = {
   previousComments: InfiniteCommentsData | undefined;
+  previousPost: IPost | undefined;
+  previousPostLists: [QueryKey, InfinitePostsData][];
 };
 type IDeleteContext = {
   previousPostLists: [QueryKey, InfinitePostsData][];
@@ -354,6 +356,10 @@ export const usePostMutations = () => {
         "comments",
         { postId, postLocalId },
       ]);
+      const previousPost = queryClient.getQueryData<IPost>(["post", postId]);
+      const previousPostLists = queryClient.getQueriesData<InfinitePostsData>([
+        "posts",
+      ]);
 
       const myProfile = queryClient.getQueryData<IUserProfile>("myProfile");
       const fakeComment: IComment = {
@@ -389,7 +395,48 @@ export const usePostMutations = () => {
         }
       );
 
-      return { previousComments };
+      queryClient.setQueryData<IPost | undefined>(
+        ["post", postId],
+        (oldPost: IPost | undefined) =>
+          oldPost
+            ? {
+                ...oldPost,
+                comment_count: Math.max(0, oldPost.comment_count + 1),
+              }
+            : oldPost
+      );
+
+      queryClient.setQueriesData<InfinitePostsData>(
+        ["posts"],
+        (oldData: InfinitePostsData | undefined) => {
+          if (!oldData) {
+            return { pages: [], pageParams: [] };
+          }
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              posts: page.posts.map((post) =>
+                post.local_id === postLocalId || post.id === postId
+                  ? {
+                      ...post,
+                      comment_count: Math.max(0, post.comment_count + 1),
+                    }
+                  : post
+              ),
+            })),
+          };
+        }
+      );
+
+      try {
+        await PostRepo.adjustCommentCount(1, postId, postLocalId);
+      } catch (e) {
+        console.warn("[usePostMutations] SQLite add comment count error:", e);
+      }
+
+      return { previousComments, previousPost, previousPostLists };
     },
     onError: (
       error: unknown,
@@ -402,6 +449,18 @@ export const usePostMutations = () => {
       if (context?.previousComments) {
         queryClient.setQueryData(commentsQueryKey, context.previousComments);
       }
+      if (context?.previousPost) {
+        queryClient.setQueryData(["post", postId], context.previousPost);
+      }
+      context?.previousPostLists?.forEach(
+        ([key, data]: [QueryKey, InfinitePostsData]) => {
+          queryClient.setQueryData(key, data);
+        }
+      );
+
+      PostRepo.adjustCommentCount(-1, postId, postLocalId).catch((e) => {
+        console.warn("[usePostMutations] SQLite rollback comment count error:", e);
+      });
     },
     onSettled: (data: unknown, error: unknown, newComment: IAddCommentData) => {
       const { postId, postLocalId } = newComment;

@@ -275,6 +275,33 @@ export const toggleBookmark = async (
   );
 };
 
+export const adjustCommentCount = async (
+  delta: number,
+  postId?: number,
+  postLocalId?: string
+): Promise<void> => {
+  const db = getDatabase();
+
+  if (postLocalId) {
+    await db.runAsync(
+      `UPDATE posts
+       SET comment_count = MAX(0, comment_count + ?)
+       WHERE local_id = ?`,
+      [delta, postLocalId]
+    );
+    return;
+  }
+
+  if (postId && Number.isInteger(postId)) {
+    await db.runAsync(
+      `UPDATE posts
+       SET comment_count = MAX(0, comment_count + ?)
+       WHERE id = ?`,
+      [delta, postId]
+    );
+  }
+};
+
 export const pruneOldPosts = async (keepCount: number): Promise<void> => {
   const db = getDatabase();
   await db.runAsync(

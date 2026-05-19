@@ -32,7 +32,7 @@ export default function PostScreen() {
     validServerId ? getPostById : getPostByLocalId,
     {
       enabled: Boolean(validServerId || localId),
-      refetchInterval: 2000,
+      refetchInterval: 1000,
     }
   );
 

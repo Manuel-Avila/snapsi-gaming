@@ -56,7 +56,7 @@ export default function Games() {
       }
       return undefined;
     },
-    refetchInterval: 2000,
+    refetchInterval: 1000,
   });
 
   const games = data?.pages.flatMap((page) => page.results) ?? [];

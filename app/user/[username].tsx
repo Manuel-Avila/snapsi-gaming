@@ -46,7 +46,7 @@ export default function Profile() {
     getProfile,
     {
       enabled: !!username,
-      refetchInterval: 2000,
+      refetchInterval: 1000,
     }
   );
   const {
@@ -60,7 +60,7 @@ export default function Profile() {
   } = useInfiniteQuery(["posts", username], getUserPostsFromDb, {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!username && activeTab === "posts" && isDbReady,
-    refetchInterval: 2000,
+    refetchInterval: 1000,
   });
 
   const {
@@ -75,7 +75,7 @@ export default function Profile() {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!username && activeTab === "ratings" && isDbReady,
     refetchOnWindowFocus: true,
-    refetchInterval: 2000,
+    refetchInterval: 1000,
   });
 
   const handleRefetch = async () => {

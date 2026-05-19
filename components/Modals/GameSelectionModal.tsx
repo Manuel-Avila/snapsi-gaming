@@ -46,13 +46,13 @@ export default function GameSelectionModal({ isVisible, onClose, onApplyFilter, 
   const { data: categories, isLoading: isLoadingCategories } = useQuery<{ results: IGameCategory[] }>(
     ["gameCategories"],
     getCategories,
-    { enabled: isVisible && activeTab === "category", refetchInterval: 2000 }
+    { enabled: isVisible && activeTab === "category", refetchInterval: 1000 }
   );
 
   const { data: searchResults, isLoading: isLoadingGames } = useQuery(
     ["gamesSearch", debouncedSearch],
     () => searchGames(debouncedSearch),
-    { enabled: isVisible && activeTab === "game", refetchInterval: 2000 }
+    { enabled: isVisible && activeTab === "game", refetchInterval: 1000 }
   );
 
   const handleSelectCategory = (category: IGameCategory) => {

@@ -42,7 +42,7 @@ export default function Home() {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     refetchOnWindowFocus: true,
     enabled: isDbReady,
-    refetchInterval: 2000,
+    refetchInterval: 1000,
   });
 
   const posts = data?.pages.flatMap((page) => page.posts) ?? [];
