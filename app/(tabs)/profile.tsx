@@ -40,6 +40,7 @@ export default function Profile() {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!myProfile?.username && isDbReady,
     refetchOnWindowFocus: true,
+    refetchInterval: 2000,
   });
 
   const {
@@ -54,6 +55,7 @@ export default function Profile() {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!myProfile?.username && activeTab === "ratings" && isDbReady,
     refetchOnWindowFocus: true,
+    refetchInterval: 2000,
   });
 
   const handleRefetch = async () => {

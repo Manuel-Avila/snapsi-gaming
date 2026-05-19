@@ -33,10 +33,6 @@ export const subscribe = (cb: (online: boolean) => void): (() => void) => {
 
 export const isOnline = (): boolean => _isOnline;
 
-/**
- * Do a real HTTP ping to verify the backend is reachable,
- * not just that the device has a network connection.
- */
 export const checkConnectivity = async (): Promise<boolean> => {
   try {
     await api.get("/", { timeout: 5000 });

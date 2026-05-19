@@ -14,6 +14,7 @@ export default function RouteGuardLayout() {
 
   useQuery(["myProfile"], getMyProfile, {
     enabled: !!token,
+    refetchInterval: 2000,
   });
 
   useEffect(() => {

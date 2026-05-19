@@ -54,6 +54,7 @@ export default function CommentsModal({ isVisible, onClose, postId, postLocalId 
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: !!postId && isVisible && isDbReady,
     refetchOnWindowFocus: true,
+    refetchInterval: 2000,
   });
   const comments = data?.pages.flatMap((page) => page.comments ?? []);
 
